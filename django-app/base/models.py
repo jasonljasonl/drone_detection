@@ -20,12 +20,12 @@ class Radar(models.Model):
     latitude = models.FloatField(max_length=256, default=0)
     longitude = models.FloatField(max_length=256, default=0)
     altitude = models.FloatField(max_length=256,  default=0)
-    radar_range = models.CharField(max_length=30)
+    radar_range = models.FloatField(max_length=30)
     status_type = {'active':'active',
                    'inactive':'inactive',
                    'paused':'paused'
                    }
-    status = models.CharField(choices=radar_type)
+    status = models.CharField(choices=status_type)
     installation_date = models.DateTimeField(auto_now_add=True)
 
 
