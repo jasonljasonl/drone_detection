@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models import ForeignKey
+
 
 class Vehicle(models.Model):
     system_id = models.IntegerField()
@@ -29,8 +31,7 @@ class Radar(models.Model):
     installation_date = models.DateTimeField(auto_now_add=True)
 
 
-class Detection(models.Model):
-    event_timestamp = models.DateTimeField(auto_now_add=True)
-    event_position = models.CharField(max_length=256)
-    event_log = models.TextField()
+class EventDetectionLog(models.Model):
+    log_creation_date = models.DateTimeField(auto_now_add=True)
+    related_vehicle = ForeignKey(Vehicle, on_delete=models.CASCADE)
     radar = models.ForeignKey(Radar, on_delete=models.CASCADE)
