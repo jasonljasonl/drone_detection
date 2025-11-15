@@ -9,5 +9,4 @@ urlpatterns = [
     path('dist/', calcul_distance_view, name='distance'),
     path('create-topic/', create_topic_view),
     path('run-producer/', run_kafka_producer_view, name='run_kafka_producer'),
-
 ]

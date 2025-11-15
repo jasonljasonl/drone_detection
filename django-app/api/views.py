@@ -24,20 +24,18 @@ def view_radar_list(request):
     return Response(serializer.data)
 
 
-
 @api_view(['POST'])
 def create_topic_view(request):
-    topic_name = request.data.get('topic', 'mavlink_messages')
+    topic_name = request.data.get('topic')
     kafka_topic = create_kafka_topic(topic_name)
     return Response({'result': kafka_topic})
 
 
-@api_view(['GET', 'POST'])
+@api_view(['GET','POST'])
 def run_kafka_producer_view(request):
     return kafka_producer(request)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 def calcul_distance_view(request):
-    detection_list = calcul_distance()
-    return Response({"detections": detection_list})
+    return calcul_distance(request)
