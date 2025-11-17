@@ -1,13 +1,16 @@
+import time
 import json
 import redis
 from kafka.admin import NewTopic
 from rest_framework.response import Response
 from pymavlink import mavutil
-from kafka import KafkaConsumer, KafkaProducer, KafkaAdminClient
+from kafka import  KafkaProducer, KafkaAdminClient
 import os
 import django
 from base.models import Radar, Vehicle
 from geopy.distance import geodesic
+from channels.layers import get_channel_layer
+from aiokafka import AIOKafkaConsumer
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "dvrc.settings")
 django.setup()
@@ -83,15 +86,29 @@ def kafka_producer(request):
             return Response({'error': str(e)})
 
 
-def kafka_consumer():
-    consumer = KafkaConsumer(
+async def kafka_consumer():
+    consumer = AIOKafkaConsumer(
         'mavlink_messages',
         'distance_messages',
         bootstrap_servers=['localhost:9092'],
         value_deserializer=lambda v: json.loads(v.decode('utf-8'))
     )
-    for message in consumer:
-        print(f'{message.topic}: {message.value}')
+    await consumer.start()
+
+    channel_layer = get_channel_layer()
+    try:
+        async for message in consumer:
+            print(f'{message.topic}: {message.value}')
+            await channel_layer.group_send (
+                'mavlink_group',
+                {
+                    'type':'mavlink_message',
+                    'topic': message.topic,
+                    'data': message.value
+                }
+            )
+    finally:
+        await consumer.stop()
 
 
 def calcul_distance(request):
@@ -99,37 +116,41 @@ def calcul_distance(request):
         bootstrap_servers=['localhost:9092'],
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
-    detection_list = []
+
     try:
-        detected = get_all_vehicles()
+        radars = list(Radar.objects.all())
 
-        if not detected:
-            return Response('no detected_vehicles_global')
+        while True:
+            detection_list = []
 
-        for radar in Radar.objects.all():
-            radar_position = (radar.latitude, radar.longitude)
+            detected = get_all_vehicles()
+            if not detected:
+                continue
 
-            for vehicle in detected.values():
-                vehicle_position = (vehicle["latitude"], vehicle["longitude"])
-                distance_between = geodesic(radar_position, vehicle_position).meters
+            for radar in radars:
+                radar_position = (radar.latitude, radar.longitude)
 
-                data = f'"{radar.name}" detected the vehicle with system_id: "{vehicle["system_id"]}" at {distance_between:.2f} meters'
-                detection_list.append(data)
+                for vehicle in detected.values():
+                    vehicle_position = (vehicle["latitude"], vehicle["longitude"])
+                    distance_between = geodesic(radar_position, vehicle_position).meters
 
-                if distance_between <= 500:
-                    Vehicle.objects.update_or_create(
-                        system_id=vehicle["system_id"],
-                        defaults={
-                            "latitude": vehicle["latitude"],
-                            "longitude": vehicle["longitude"],
-                            "altitude": vehicle["altitude"]
-                        }
-                    )
+                    data = f'{radar.name} detected the vehicle with system_id: {vehicle["system_id"]} at {distance_between:.2f} meters'
+                    detection_list.append(data)
 
-        producer.send('distance_messages', detection_list)
-        producer.flush()
+                    if distance_between <= 500:
+                        Vehicle.objects.update_or_create(
+                            system_id=vehicle["system_id"],
+                            defaults={
+                                "latitude": vehicle["latitude"],
+                                "longitude": vehicle["longitude"],
+                                "altitude": vehicle["altitude"]
+                            }
+                        )
 
-        return Response(detection_list)
+            for detection in detection_list:
+                producer.send('distance_messages', detection)
+            producer.flush()
+            time.sleep(1)
 
     except Exception as e:
         print('Error:', e)

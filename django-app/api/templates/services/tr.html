@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>MAVLink Live</title>
+</head>
+<body>
+
+<h1>realtime mavlink data</h1>
+
+<pre id="output"></pre>
+
+<script>
+    const socket = new WebSocket("ws://" + window.location.host + "/ws/mavlink/");
+
+    socket.onopen = function() {
+        console.log("WebSocket connected!");
+    };
+
+    socket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        console.log("data :", data);
+
+        const out = document.getElementById("output");
+        out.textContent += JSON.stringify(data, null, 2) + "\n";
+    };
+
+    socket.onclose = function() {
+        console.log("WebSocket closed.");
+    };
+
+    socket.onerror = function(error) {
+        console.log("WebSocket error :", error);
+    };
+</script>
+
+</body>
+</html>

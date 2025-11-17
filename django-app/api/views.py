@@ -1,3 +1,4 @@
+from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from .serializers import RadarSerializer
@@ -36,6 +37,9 @@ def run_kafka_producer_view(request):
     return kafka_producer(request)
 
 
-@api_view(['GET', 'POST'])
+@api_view(['GET'])
 def calcul_distance_view(request):
     return calcul_distance(request)
+
+def realtime_view(request):
+    return render(request, 'services/tr.html')
