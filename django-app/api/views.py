@@ -40,6 +40,5 @@ def run_kafka_producer_view(request):
 @api_view(['GET'])
 def calcul_distance_view(request):
     return calcul_distance(request)
-
 def realtime_view(request):
     return render(request, 'services/tr.html')

@@ -3,35 +3,118 @@
 <head>
     <meta charset="utf-8">
     <title>MAVLink Live</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
 </head>
+
 <body>
 
-<h1>realtime mavlink data</h1>
+<h1>Realtime MAVLink Data</h1>
 
-<pre id="output"></pre>
+<div id="map" style="height:50vh;"></div>
+
+<table id="vehicleTable">
+    <thead>
+        <tr>
+            <th>System ID</th>
+            <th>Latitude</th>
+            <th>Longitude</th>
+            <th>Altitude</th>
+            <th>Distances</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
 
 <script>
-    const socket = new WebSocket("ws://" + window.location.host + "/ws/mavlink/");
+const socket = new WebSocket("ws://" + window.location.host + "/ws/mavlink/");
+const tableBody = document.getElementById("vehicleTable").querySelector("tbody");
+const rows = {};
 
-    socket.onopen = function() {
-        console.log("WebSocket connected!");
-    };
+var map = L.map('map').setView([0, 0], 2);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+}).addTo(map);
 
-    socket.onmessage = function(event) {
-        const data = JSON.parse(event.data);
-        console.log("data :", data);
+const markers = {};
+const radarMarkers = {};
 
-        const out = document.getElementById("output");
-        out.textContent += JSON.stringify(data, null, 2) + "\n";
-    };
+socket.onmessage = (event) => {
+    const payload = JSON.parse(event.data);
+    const id = payload.data.system_id || payload.data.vehicle_id;
 
-    socket.onclose = function() {
-        console.log("WebSocket closed.");
-    };
+    if (!rows[id]) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${id}</td>
+            <td>${payload.data.latitude || ''}</td>
+            <td>${payload.data.longitude || ''}</td>
+            <td>${payload.data.altitude || ''}</td>
+            <td>${payload.topic === 'distance_messages' ? payload.data : ''}</td>
+        `;
+        tableBody.appendChild(row);
+        rows[id] = {row, distances: {}};
+        if (payload.topic === 'distance_messages') {
+            rows[id].distances[payload.data.radar] = payload.data.distance;
+        }
+    } else {
+        const rowObj = rows[id];
+        const row = rowObj.row;
 
-    socket.onerror = function(error) {
-        console.log("WebSocket error :", error);
-    };
+        if (payload.topic === 'mavlink_messages') {
+            row.cells[1].textContent = payload.data.latitude;
+            row.cells[2].textContent = payload.data.longitude;
+            row.cells[3].textContent = payload.data.altitude;
+        } else if (payload.topic === 'distance_messages') {
+            rowObj.distances[payload.data.radar] = payload.data.distance;
+        }
+
+        row.cells[4].textContent = Object.entries(rowObj.distances)
+            .map(([radar, dist]) => `${radar}: ${dist} m`)
+            .join(', ');
+    }
+
+    if (payload.topic === "mavlink_messages") {
+        const lat = payload.data.latitude;
+        const lon = payload.data.longitude;
+
+        if (lat !== undefined && lon !== undefined) {
+            if (!markers[id]) {
+                markers[id] = L.circle([lat, lon], {color:'blue', fillOpacity:0.5, radius:100}).addTo(map);
+                markers[id].bindPopup(`Vehicle ${id}`);
+            } else {
+                markers[id].setLatLng([lat, lon]);
+            }
+        }
+    }
+
+if (payload.topic === "distance_messages") {
+    const radarPos = payload.data.radar_position;
+    const radarId = id + '_' + payload.data.radar;
+
+    if (radarPos && radarPos.length === 2) {
+        const [lat, lon] = radarPos;
+
+        if (!radarMarkers[radarId]) {
+            radarMarkers[radarId] = L.circle([lat, lon], {color:'red', fillOpacity:0.5, radius:100}).addTo(map);
+        } else {
+            radarMarkers[radarId].setLatLng([lat, lon]);
+        }
+
+        if (map.getZoom() === 2) {
+            map.setView([lat, lon], 12);
+        }
+    }
+}
+
+};
 </script>
 
 </body>

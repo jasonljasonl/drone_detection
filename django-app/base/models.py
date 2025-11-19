@@ -2,13 +2,6 @@ from django.db import models
 from django.db.models import ForeignKey
 
 
-class Vehicle(models.Model):
-    system_id = models.IntegerField()
-    latitude = models.FloatField(max_length=256)
-    longitude = models.FloatField(max_length=256)
-    altitude = models.FloatField(max_length=256)
-    detected_timestamp = models.DateTimeField(auto_now_add=True)
-
 
 class Radar(models.Model):
     name = models.CharField(max_length=256)
@@ -29,6 +22,15 @@ class Radar(models.Model):
                    }
     status = models.CharField(choices=status_type)
     installation_date = models.DateTimeField(auto_now_add=True)
+
+
+class Vehicle(models.Model):
+    system_id = models.IntegerField()
+    latitude = models.FloatField(max_length=256)
+    longitude = models.FloatField(max_length=256)
+    altitude = models.FloatField(max_length=256)
+    detected_timestamp = models.DateTimeField(auto_now_add=True)
+    detected_radar = models.ForeignKey(Radar, on_delete=models.CASCADE, default=None)
 
 
 class EventDetectionLog(models.Model):

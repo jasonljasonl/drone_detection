@@ -11,6 +11,10 @@ from base.models import Radar, Vehicle
 from geopy.distance import geodesic
 from channels.layers import get_channel_layer
 from aiokafka import AIOKafkaConsumer
+import logging
+from datetime import datetime
+
+timestamp = datetime.now().isoformat()
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "dvrc.settings")
 django.setup()
@@ -111,7 +115,22 @@ async def kafka_consumer():
         await consumer.stop()
 
 
+logger = logging.getLogger('myapp')
+logger.setLevel(logging.WARNING)
+
+if not logger.handlers:
+    handler = logging.FileHandler('kafka_log.log', encoding='utf-8')
+    handler.setLevel(logging.WARNING)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+
+
 def calcul_distance(request):
+
+    is_vehicle_in_zone_state = {}
+
     producer = KafkaProducer(
         bootstrap_servers=['localhost:9092'],
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
@@ -131,21 +150,49 @@ def calcul_distance(request):
                 radar_position = (radar.latitude, radar.longitude)
 
                 for vehicle in detected.values():
+                    system_id = vehicle["system_id"]
                     vehicle_position = (vehicle["latitude"], vehicle["longitude"])
                     distance_between = geodesic(radar_position, vehicle_position).meters
 
-                    data = f'{radar.name} detected the vehicle with system_id: {vehicle["system_id"]} at {distance_between:.2f} meters'
+                    vehicle_in_zone = distance_between <= 500
+                    vehicle_was_in_zone = is_vehicle_in_zone_state.get(system_id, False)
+
+                    if vehicle_in_zone and not vehicle_was_in_zone:
+                        timestamp = datetime.now().isoformat()
+                        logger.warning(
+                            f'Vehicle with ID : {system_id} has been detected by radar: {radar.name} '
+                            f'at latitude: {vehicle["latitude"]}, longitude: {vehicle["longitude"]} '
+                            f'and altitude {vehicle["altitude"]} at {timestamp}'
+                        )
+
+                    is_vehicle_in_zone_state[system_id] = vehicle_in_zone
+
+                    data = {
+                        "radar": radar.name,
+                        "system_id": system_id,
+                        "distance": distance_between,
+                        "radar_position": radar_position
+                    }
+                    producer.send('distance_messages', data)
+
                     detection_list.append(data)
 
-                    if distance_between <= 500:
-                        Vehicle.objects.update_or_create(
-                            system_id=vehicle["system_id"],
+                    if vehicle_in_zone:
+                        vehicle_obj, created = Vehicle.objects.get_or_create(
+                            system_id=system_id,
                             defaults={
                                 "latitude": vehicle["latitude"],
                                 "longitude": vehicle["longitude"],
-                                "altitude": vehicle["altitude"]
+                                "altitude": vehicle["altitude"],
+                                "detected_radar": radar
                             }
                         )
+                        if not created:
+                            vehicle_obj.latitude = vehicle["latitude"]
+                            vehicle_obj.longitude = vehicle["longitude"]
+                            vehicle_obj.altitude = vehicle["altitude"]
+                            vehicle_obj.save()
+
 
             for detection in detection_list:
                 producer.send('distance_messages', detection)
