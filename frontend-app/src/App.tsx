@@ -1,16 +1,16 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import DroneDisplay from './components/DroneDisplay';
+import RadarDisplay from './components/RadarDisplay';
+import WebsocketData from './components/WebsocketData';
 
 function App() {
-  const [count, setCount] = useState(0)
-
+    const data = WebsocketData();
   return (
     <>
-
+      <RadarDisplay selectedRadar="home-radar" data={data} />
+      <RadarDisplay selectedRadar="downtown-radar" data={data} />
+      <DroneDisplay selectedDrone="drone" data={data} />
     </>
-  )
+  );
 }
 
-export default App
+export default App;

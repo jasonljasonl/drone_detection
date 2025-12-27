@@ -142,3 +142,5 @@ def calcul_distance_task():
     except Exception as e:
         print('Error:', e)
         return Response({'error': str(e)})
+
+
