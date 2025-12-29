@@ -14,7 +14,7 @@ export default function DroneDisplay({ selectedDrone, data }: Props) {
       <h3>{selectedDrone}</h3>
       <LabelComponent label={{ subtitle: 'latitude', subtitleData: droneValues.latitude ?? '---', subtitleSize: 'medium' }} />
       <LabelComponent label={{ subtitle: 'longitude', subtitleData: droneValues.longitude ?? '---', subtitleSize: 'medium' }} />
-      <LabelComponent label={{ subtitle: 'altitude', subtitleData: droneValues.altitude ?? '---', subtitleSize: 'large' }} />
+      <LabelComponent label={{ subtitle: 'altitude', subtitleData: droneValues.altitude ?? '---', subtitleSize: 'medium' }} />
     </div>
   );
 }

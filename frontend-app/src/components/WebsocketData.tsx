@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 export type RadarData = Record<string, string>;
-export type LabelData = Record<string, Record<string, string>>;
+export type LabelData = Record<string, RadarData>;
 
 export default function WebsocketData() {
   const [data, setData] = useState<LabelData>({});
@@ -12,14 +12,19 @@ export default function WebsocketData() {
 
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      const source = message.data?.radar ?? 'drone';
-      const values: Record<string, string> = {};
-      if (message.data) {
-        Object.entries(message.data).forEach(([key, value]) => {
-          values[key] = Array.isArray(value) ? value.join(', ') : value?.toString() ?? '---';
-        });
+
+      let source = 'drone';
+      if (message.topic === 'distance_messages') {
+        source = message.data.radar;
       }
-      setData((prev) => ({
+
+      const values: RadarData = {};
+
+      Object.entries(message.data).forEach(([key, value]) => {
+        values[key] = value?.toString() ?? '---';
+      });
+
+      setData(prev => ({
         ...prev,
         [source]: {
           ...prev[source],
