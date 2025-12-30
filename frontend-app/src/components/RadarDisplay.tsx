@@ -41,12 +41,7 @@ export default function RadarDisplay({ selectedRadar, data, radarPosition, radar
               subtitleData: radarInfo?.status ?? '---',
             }}
           />
-          <LabelComponent
-            label={{
-              subtitle: 'INSTALLATION DATE',
-              subtitleData: radarInfo?.installationDate ?? '---',
-            }}
-          />
+
         </div>
       </div>
 
